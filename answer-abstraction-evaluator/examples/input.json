@@ -1,0 +1,9 @@
+{
+  "precedingContext": [
+    "The conversation has explained one concrete AI cascade.",
+    "The user is now asking about the broader routing design space."
+  ],
+  "userRequest": "What architectural patterns exist for AI routing?",
+  "candidateAnswer": "First install a gateway and add the following provider configuration."
+}
+
