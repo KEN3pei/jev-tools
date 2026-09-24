@@ -1,6 +1,6 @@
 # Answer Abstraction Evaluator
 
-質問が求める抽象度と、回答が説明を開始する抽象度の不一致をJevで評価するCLI兼ライブラリです。
+質問が求める抽象度と、回答が説明を開始する抽象度の不一致をJevで評価する、Go製のCLI兼パッケージです。
 
 たとえば「認証方式にはどのような設計があるか」という設計レベルの質問に対して、回答がいきなり特定ライブラリのインストール手順から始まっていないかを検出します。
 
@@ -26,7 +26,7 @@ unclear
 
 ## Requirements
 
-- Node.js 20以上
+- Go 1.22以上
 - TypeSafe APIキー
 
 ```bash
@@ -57,13 +57,13 @@ cd ~/Apps/jev-tools/answer-abstraction-evaluator
 `--input`でファイルを渡します。
 
 ```bash
-npm run evaluate -- --input ./examples/input.json
+go run ./cmd/answer-abstraction-evaluator --input ./examples/input.json
 ```
 
 標準入力でも利用できます。
 
 ```bash
-cat ./examples/input.json | npm run evaluate
+cat ./examples/input.json | go run ./cmd/answer-abstraction-evaluator
 ```
 
 長い質問や回答をシェル引数へ直接入れる必要はありません。
@@ -97,43 +97,30 @@ cat ./examples/input.json | npm run evaluate
 | `restructure` | 抽象度または前提知識の扱いに大きな不一致があり、構成を組み直す |
 | `ask_clarifying_question` | 求められる抽象度が曖昧なため、先に確認する |
 
-既定の閾値は`src/evaluator.js`の`DEFAULT_THRESHOLDS`にあります。実運用では、自分の評価データを使って調整してください。
+既定の閾値は`evaluator/evaluator.go`の`DefaultThresholds`にあります。実運用では、自分の評価データを使って調整してください。
 
 ## Library usage
 
 `state`をソースコード内で毎回書き換える必要はありません。質問、回答、前後文脈を関数引数で渡すと、内部で固定されたJev用`state`へ変換します。
 
-```js
-import { evaluateAnswer } from "./src/evaluator.js";
-
-const result = await evaluateAnswer({
-  precedingContext: [
-    "認証に関する基本用語は説明済み"
-  ],
-  userRequest:
-    "認証方式にはどのような設計があり、どう選ぶべき？",
-  candidateAnswer:
-    "まずnpm install next-authを実行します。"
-});
-
-console.log(result.decision);
+```go
+client := evaluator.Client{APIKey: os.Getenv("TYPESAFE_API_KEY")}
+result, err := client.Evaluate(context.Background(), evaluator.Input{
+    PrecedingContext: []string{"認証に関する基本用語は説明済み"},
+    UserRequest:     "認証方式にはどのような設計があり、どう選ぶべき？",
+    CandidateAnswer: "まず特定ライブラリをインストールします。",
+})
 ```
 
 APIキー、モデル、エンドポイント、閾値、`fetch`実装は第2引数で変更できます。
 
-```js
-const result = await evaluateAnswer(input, {
-  apiKey: process.env.TYPESAFE_API_KEY,
-  model: "jev-latest",
-  baseUrl: "https://api.typesafe.ai/v1/systemone",
-  thresholds: {
-    clarificationNeeded: 0.7,
-    abstractionMismatch: 0.7,
-    prematureSpecificity: 0.65,
-    progressiveDisclosureMinimum: 0.5,
-    prerequisiteFitMinimum: 0.3
-  }
-});
+```go
+client := evaluator.Client{
+    APIKey:  os.Getenv("TYPESAFE_API_KEY"),
+    Model:   "jev-latest",
+    BaseURL: "https://api.typesafe.ai/v1/systemone",
+    Thresholds: evaluator.DefaultThresholds,
+}
 ```
 
 ## Input contract
@@ -166,7 +153,7 @@ const result = await evaluateAnswer(input, {
 ユニットテストはTypeSafe APIを呼ばず、通信部分を差し替えて実行します。
 
 ```bash
-npm test
+go test ./...
 ```
 
 実際のモデル品質を確認するには、質問・回答・期待判定を含む評価ケースを別途蓄積してください。モデルや質問、閾値を変更した場合は、同じ評価セットで回帰評価することを推奨します。
@@ -177,4 +164,3 @@ npm test
 - 評価対象の回答全文がTypeSafe APIへ送信されます。機密情報や個人情報の取り扱いを確認してください。
 - Jevの確率は正解の証明ではありません。閾値は実際の人間評価との対応を測って調整してください。
 - 自動修正へ組み込む場合は、無限ループを避けるため修正回数に上限を設けてください。
-

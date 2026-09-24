@@ -15,8 +15,7 @@ jev-tools/
 ├── README.md
 └── answer-abstraction-evaluator/
     ├── README.md
-    ├── package.json
-    ├── src/
-    └── test/
+    ├── go.mod
+    ├── cmd/
+    └── evaluator/
 ```
-
