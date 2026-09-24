@@ -14,7 +14,7 @@ import (
 
 func main() {
 	eventName := flag.String("event", "", "hook event: user-prompt-submit or stop")
-	dataDir := flag.String("data-dir", defaultDataDir(), "state and log directory")
+	dataDir := flag.String("data-dir", defaultDataDir(), "temporary state directory")
 	flag.Parse()
 	var event hook.Event
 	if err := json.NewDecoder(os.Stdin).Decode(&event); err != nil {

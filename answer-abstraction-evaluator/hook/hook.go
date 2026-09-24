@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/KEN3pei/jev-tools/answer-abstraction-evaluator/evaluator"
 )
@@ -37,30 +36,11 @@ type EvaluationClient interface {
 type Handler struct {
 	Client  EvaluationClient
 	DataDir string
-	Now     func() time.Time
 }
 
 type promptState struct {
 	Prompt          string `json:"prompt"`
 	RevisionPending bool   `json:"revisionPending"`
-}
-
-type LogEntry struct {
-	Timestamp           time.Time        `json:"timestamp"`
-	SessionID           string           `json:"sessionId,omitempty"`
-	TurnID              string           `json:"turnId,omitempty"`
-	Attempt             int              `json:"attempt"`
-	Decision            string           `json:"decision"`
-	Scores              evaluator.Scores `json:"scores,omitempty"`
-	RequestedLevel      string           `json:"requestedLevel,omitempty"`
-	AnswerEntryLevel    string           `json:"answerEntryLevel,omitempty"`
-	CorrectionRequested bool             `json:"correctionRequested"`
-	Corrected           bool             `json:"corrected"`
-	QuestionSHA256      string           `json:"questionSha256,omitempty"`
-	AnswerSHA256        string           `json:"answerSha256,omitempty"`
-	Model               string           `json:"model,omitempty"`
-	Usage               map[string]any   `json:"usage,omitempty"`
-	Error               string           `json:"error,omitempty"`
 }
 
 func (h Handler) CapturePrompt(event Event) error {
@@ -83,31 +63,21 @@ func (h Handler) EvaluateStop(ctx context.Context, event Event) Output {
 	}
 	state, err := h.readPromptState(event.SessionID)
 	if err != nil || answer == "" {
-		h.log(LogEntry{Timestamp: h.now(), SessionID: event.SessionID, TurnID: event.TurnID, Decision: "skipped", Error: errorText(err, answer)})
-		return Output{Continue: true}
+		return Output{Continue: true, SystemMessage: "Jev evaluation skipped: no matching question or answer."}
 	}
 	question := strings.TrimSpace(state.Prompt)
 	result, err := h.Client.Evaluate(ctx, evaluator.Input{UserRequest: question, CandidateAnswer: answer})
 	if err != nil {
-		h.log(LogEntry{Timestamp: h.now(), SessionID: event.SessionID, TurnID: event.TurnID, Decision: "error", QuestionSHA256: digest(question), AnswerSHA256: digest(answer), Error: err.Error()})
 		return Output{Continue: true, SystemMessage: "Jev evaluation failed; the answer was not blocked."}
 	}
 
 	bad := result.Decision != "pass"
-	entry := LogEntry{
-		Timestamp: h.now(), SessionID: event.SessionID, TurnID: event.TurnID,
-		Attempt: attempt(event.StopHookActive), Decision: result.Decision, Scores: result.Scores,
-		RequestedLevel: result.RequestedLevel, AnswerEntryLevel: result.AnswerEntryLevel,
-		CorrectionRequested: bad && !event.StopHookActive, Corrected: event.StopHookActive && result.Decision == "pass",
-		QuestionSHA256: digest(question), AnswerSHA256: digest(answer), Model: result.Model, Usage: result.Usage,
-	}
-	h.log(entry)
 	if !bad {
-		_ = h.writePromptState(event.SessionID, promptState{Prompt: question})
-		return Output{Continue: true, SystemMessage: correctionMessage(event.StopHookActive)}
+		_ = os.Remove(h.promptPath(event.SessionID))
+		return Output{Continue: true, SystemMessage: evaluationMessage(result, event.StopHookActive)}
 	}
 	if event.StopHookActive {
-		_ = h.writePromptState(event.SessionID, promptState{Prompt: question})
+		_ = os.Remove(h.promptPath(event.SessionID))
 		return Output{Continue: true, SystemMessage: "Jev evaluation still recommends revision; retry limit reached."}
 	}
 	_ = h.writePromptState(event.SessionID, promptState{Prompt: question, RevisionPending: true})
@@ -117,25 +87,6 @@ func (h Handler) EvaluateStop(ctx context.Context, event Event) Output {
 func (h Handler) stateDir() string { return filepath.Join(h.DataDir, "state") }
 func (h Handler) promptPath(sessionID string) string {
 	return filepath.Join(h.stateDir(), safeID(sessionID)+".json")
-}
-func (h Handler) logPath() string { return filepath.Join(h.DataDir, "evaluations.jsonl") }
-func (h Handler) now() time.Time {
-	if h.Now != nil {
-		return h.Now()
-	}
-	return time.Now()
-}
-
-func (h Handler) log(entry LogEntry) {
-	if err := os.MkdirAll(h.DataDir, 0o700); err != nil {
-		return
-	}
-	file, err := os.OpenFile(h.logPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-	_ = json.NewEncoder(file).Encode(entry)
 }
 
 func (h Handler) readPromptState(sessionID string) (promptState, error) {
@@ -171,26 +122,11 @@ func digest(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }
-func attempt(active bool) int {
+func evaluationMessage(result evaluator.Result, active bool) string {
 	if active {
-		return 2
+		return fmt.Sprintf("Jev evaluation: pass after one revision (requested=%s, answer=%s).", result.RequestedLevel, result.AnswerEntryLevel)
 	}
-	return 1
-}
-func correctionMessage(active bool) string {
-	if active {
-		return "Jev evaluation passed after one revision."
-	}
-	return ""
-}
-func errorText(err error, answer string) string {
-	if err != nil {
-		return err.Error()
-	}
-	if answer == "" {
-		return "last_assistant_message is empty"
-	}
-	return ""
+	return fmt.Sprintf("Jev evaluation: pass (requested=%s, answer=%s).", result.RequestedLevel, result.AnswerEntryLevel)
 }
 
 func revisionReason(result evaluator.Result) string {

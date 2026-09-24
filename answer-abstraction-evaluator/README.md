@@ -166,13 +166,13 @@ go build -o ./bin/codex-hook ./cmd/codex-hook
 
 設定例は[`examples/hooks.json`](./examples/hooks.json)にあります。`/absolute/path/to/codex-hook`を、ビルドしたバイナリの絶対パスへ置き換えてください。
 
-フックの状態と監査ログは、既定ではOSのユーザー設定ディレクトリ以下に保存されます。`JEV_HOOK_DATA_DIR`を設定すると保存先を変更できます。
+フックの一時状態は、既定ではOSのユーザー設定ディレクトリ以下に保存されます。`JEV_HOOK_DATA_DIR`を設定すると保存先を変更できます。
 
 ```bash
 export JEV_HOOK_DATA_DIR="$HOME/.local/share/jev-tools/answer-abstraction-evaluator"
 ```
 
-監査ログは`evaluations.jsonl`です。質問と回答の本文は記録せず、それぞれのSHA-256、判定、スコア、モデル、使用トークン数、修正の有無を記録します。質問本文はStopフックへ引き渡すため、権限`0600`の状態ファイルに一時保存されます。
+評価結果はCodexの`systemMessage`として毎回表示され、ファイルには保存されません。質問本文はStopフックへ引き渡すため、権限`0600`の状態ファイルに一時保存され、評価完了後に削除されます。
 
 Jev APIが失敗した場合は回答をブロックしません。`stop_hook_active`が真の場合も追加の再生成を要求しないため、修正ループは最大1回です。
 
