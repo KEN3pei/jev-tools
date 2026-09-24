@@ -47,3 +47,23 @@ func TestStopDoesNotLoop(t *testing.T) {
 		t.Fatalf("got %#v", out)
 	}
 }
+
+func TestContinuationPromptDoesNotReplaceOriginalQuestion(t *testing.T) {
+	dir := t.TempDir()
+	h := Handler{DataDir: dir, Client: fakeClient{result: evaluator.Result{Decision: "restructure"}}}
+	if err := h.CapturePrompt(Event{SessionID: "s1", Prompt: "original question"}); err != nil {
+		t.Fatal(err)
+	}
+	answer := "first answer"
+	h.EvaluateStop(context.Background(), Event{SessionID: "s1", LastAssistantMessage: &answer})
+	if err := h.CapturePrompt(Event{SessionID: "s1", Prompt: "automatic revision instruction"}); err != nil {
+		t.Fatal(err)
+	}
+	state, err := h.readPromptState("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Prompt != "original question" {
+		t.Fatalf("prompt was overwritten: %q", state.Prompt)
+	}
+}

@@ -40,6 +40,11 @@ type Handler struct {
 	Now     func() time.Time
 }
 
+type promptState struct {
+	Prompt          string `json:"prompt"`
+	RevisionPending bool   `json:"revisionPending"`
+}
+
 type LogEntry struct {
 	Timestamp           time.Time        `json:"timestamp"`
 	SessionID           string           `json:"sessionId,omitempty"`
@@ -62,10 +67,13 @@ func (h Handler) CapturePrompt(event Event) error {
 	if strings.TrimSpace(event.Prompt) == "" {
 		return nil
 	}
+	if state, err := h.readPromptState(event.SessionID); err == nil && state.RevisionPending {
+		return nil
+	}
 	if err := os.MkdirAll(h.stateDir(), 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(h.promptPath(event.SessionID), []byte(event.Prompt), 0o600)
+	return h.writePromptState(event.SessionID, promptState{Prompt: event.Prompt})
 }
 
 func (h Handler) EvaluateStop(ctx context.Context, event Event) Output {
@@ -73,12 +81,12 @@ func (h Handler) EvaluateStop(ctx context.Context, event Event) Output {
 	if event.LastAssistantMessage != nil {
 		answer = strings.TrimSpace(*event.LastAssistantMessage)
 	}
-	questionBytes, err := os.ReadFile(h.promptPath(event.SessionID))
+	state, err := h.readPromptState(event.SessionID)
 	if err != nil || answer == "" {
 		h.log(LogEntry{Timestamp: h.now(), SessionID: event.SessionID, TurnID: event.TurnID, Decision: "skipped", Error: errorText(err, answer)})
 		return Output{Continue: true}
 	}
-	question := strings.TrimSpace(string(questionBytes))
+	question := strings.TrimSpace(state.Prompt)
 	result, err := h.Client.Evaluate(ctx, evaluator.Input{UserRequest: question, CandidateAnswer: answer})
 	if err != nil {
 		h.log(LogEntry{Timestamp: h.now(), SessionID: event.SessionID, TurnID: event.TurnID, Decision: "error", QuestionSHA256: digest(question), AnswerSHA256: digest(answer), Error: err.Error()})
@@ -95,17 +103,20 @@ func (h Handler) EvaluateStop(ctx context.Context, event Event) Output {
 	}
 	h.log(entry)
 	if !bad {
+		_ = h.writePromptState(event.SessionID, promptState{Prompt: question})
 		return Output{Continue: true, SystemMessage: correctionMessage(event.StopHookActive)}
 	}
 	if event.StopHookActive {
+		_ = h.writePromptState(event.SessionID, promptState{Prompt: question})
 		return Output{Continue: true, SystemMessage: "Jev evaluation still recommends revision; retry limit reached."}
 	}
+	_ = h.writePromptState(event.SessionID, promptState{Prompt: question, RevisionPending: true})
 	return Output{Decision: "block", Reason: revisionReason(result), SystemMessage: "Jev evaluation requested one answer revision."}
 }
 
 func (h Handler) stateDir() string { return filepath.Join(h.DataDir, "state") }
 func (h Handler) promptPath(sessionID string) string {
-	return filepath.Join(h.stateDir(), safeID(sessionID)+".prompt")
+	return filepath.Join(h.stateDir(), safeID(sessionID)+".json")
 }
 func (h Handler) logPath() string { return filepath.Join(h.DataDir, "evaluations.jsonl") }
 func (h Handler) now() time.Time {
@@ -125,6 +136,29 @@ func (h Handler) log(entry LogEntry) {
 	}
 	defer file.Close()
 	_ = json.NewEncoder(file).Encode(entry)
+}
+
+func (h Handler) readPromptState(sessionID string) (promptState, error) {
+	data, err := os.ReadFile(h.promptPath(sessionID))
+	if err != nil {
+		return promptState{}, err
+	}
+	var state promptState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return promptState{}, err
+	}
+	return state, nil
+}
+
+func (h Handler) writePromptState(sessionID string, state promptState) error {
+	if err := os.MkdirAll(h.stateDir(), 0o700); err != nil {
+		return err
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.promptPath(sessionID), data, 0o600)
 }
 
 func safeID(value string) string {
