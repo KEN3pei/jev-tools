@@ -7,6 +7,7 @@
 ## What it evaluates
 
 - 質問が主に求めている抽象度
+- 抽象度と説明順序の評価を適用すべき依頼か
 - 回答が説明を開始した抽象度
 - 抽象度の不一致
 - 全体像を示す前に具体論へ進んでいないか
@@ -77,6 +78,7 @@ cat ./examples/input.json | go run ./cmd/answer-abstraction-evaluator
   "answerEntryLevel": "implementation_mechanics",
   "answerEntryLevelConfidence": 0.76,
   "scores": {
+    "evaluationApplicable": 0.94,
     "abstractionMismatch": 0.55,
     "prematureSpecificity": 0.74,
     "progressiveDisclosure": 0.42,
@@ -92,6 +94,7 @@ cat ./examples/input.json | go run ./cmd/answer-abstraction-evaluator
 
 | Decision | Meaning |
 |---|---|
+| `not_applicable` | 直接的なコマンド、コード、事実、変換、状況報告などで、この評価を適用しない |
 | `pass` | 抽象度と説明順序に重大な問題がない |
 | `revise_entry` | 内容を保ちつつ、冒頭と説明順序を修正する |
 | `restructure` | 抽象度または前提知識の扱いに大きな不一致があり、構成を組み直す |

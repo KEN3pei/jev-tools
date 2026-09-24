@@ -18,10 +18,11 @@ func TestDecide(t *testing.T) {
 		scores Scores
 		want   string
 	}{
-		{"clarify", Scores{ClarificationNeeded: .8}, "ask_clarifying_question"},
-		{"restructure", Scores{AbstractionMismatch: .8, PrerequisiteFit: 1, ProgressiveDisclosure: 1}, "restructure"},
-		{"revise", Scores{PrematureSpecificity: .8, PrerequisiteFit: 1, ProgressiveDisclosure: 1}, "revise_entry"},
-		{"pass", Scores{PrerequisiteFit: 1, ProgressiveDisclosure: 1}, "pass"},
+		{"not applicable", Scores{EvaluationApplicable: .2}, "not_applicable"},
+		{"clarify", Scores{EvaluationApplicable: 1, ClarificationNeeded: .8}, "ask_clarifying_question"},
+		{"restructure", Scores{EvaluationApplicable: 1, AbstractionMismatch: .8, PrerequisiteFit: 1, ProgressiveDisclosure: 1}, "restructure"},
+		{"revise", Scores{EvaluationApplicable: 1, PrematureSpecificity: .8, PrerequisiteFit: 1, ProgressiveDisclosure: 1}, "revise_entry"},
+		{"pass", Scores{EvaluationApplicable: 1, PrerequisiteFit: 1, ProgressiveDisclosure: 1}, "pass"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

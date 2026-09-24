@@ -28,6 +28,10 @@ type Question struct {
 }
 
 var Questions = map[string]Question{
+	"evaluation_applicable": {
+		Type: "noul", Instructions: "Does answering `user_request` require choosing and progressively developing an abstraction level, rather than directly providing an action, fact, code snippet, command, transformation, status, acknowledgement, or clarification?",
+		Criteria: map[string]string{"true": "The usefulness of the answer materially depends on conceptual framing, explanation order, or progressive disclosure.", "false": "The request primarily asks for a direct action, fact, command, code, transformation, status, acknowledgement, or clarification."},
+	},
 	"requested_level": {
 		Type: "choice", Instructions: "What is the primary abstraction level requested by `user_request`, interpreted with `preceding_context`?",
 		Criteria: levelCriteria(),
@@ -69,6 +73,7 @@ func levelCriteria() map[string]string {
 }
 
 type Thresholds struct {
+	EvaluationApplicableMinimum  float64
 	ClarificationNeeded          float64
 	AbstractionMismatch          float64
 	PrematureSpecificity         float64
@@ -76,9 +81,17 @@ type Thresholds struct {
 	PrerequisiteFitMinimum       float64
 }
 
-var DefaultThresholds = Thresholds{0.7, 0.7, 0.65, 0.5, 0.3}
+var DefaultThresholds = Thresholds{
+	EvaluationApplicableMinimum:  0.5,
+	ClarificationNeeded:          0.7,
+	AbstractionMismatch:          0.7,
+	PrematureSpecificity:         0.65,
+	ProgressiveDisclosureMinimum: 0.5,
+	PrerequisiteFitMinimum:       0.3,
+}
 
 type Scores struct {
+	EvaluationApplicable  float64 `json:"evaluationApplicable"`
 	AbstractionMismatch   float64 `json:"abstractionMismatch"`
 	PrematureSpecificity  float64 `json:"prematureSpecificity"`
 	ProgressiveDisclosure float64 `json:"progressiveDisclosure"`
@@ -133,6 +146,9 @@ func BuildState(input Input) (map[string]any, error) {
 }
 
 func Decide(s Scores, t Thresholds) string {
+	if s.EvaluationApplicable < t.EvaluationApplicableMinimum {
+		return "not_applicable"
+	}
 	if s.ClarificationNeeded >= t.ClarificationNeeded {
 		return "ask_clarifying_question"
 	}
@@ -214,7 +230,7 @@ func (c Client) Evaluate(ctx context.Context, input Input) (Result, error) {
 	if !ok || entry.Choice == "" {
 		return Result{}, fmt.Errorf("Jev response is missing answer_entry_level")
 	}
-	names := []string{"abstraction_mismatch", "premature_specificity", "progressive_disclosure", "prerequisite_fit", "clarification_needed"}
+	names := []string{"evaluation_applicable", "abstraction_mismatch", "premature_specificity", "progressive_disclosure", "prerequisite_fit", "clarification_needed"}
 	values := make([]float64, len(names))
 	for i, name := range names {
 		values[i], err = getNoul(name)
@@ -222,6 +238,13 @@ func (c Client) Evaluate(ctx context.Context, input Input) (Result, error) {
 			return Result{}, err
 		}
 	}
-	scores := Scores{values[0], values[1], values[2], values[3], values[4]}
+	scores := Scores{
+		EvaluationApplicable:  values[0],
+		AbstractionMismatch:   values[1],
+		PrematureSpecificity:  values[2],
+		ProgressiveDisclosure: values[3],
+		PrerequisiteFit:       values[4],
+		ClarificationNeeded:   values[5],
+	}
 	return Result{requested.Choice, requested.Confidence, entry.Choice, entry.Confidence, scores, Decide(scores, thresholds), apiResult.Model, apiResult.Usage, apiResult.Answers}, nil
 }

@@ -71,7 +71,7 @@ func (h Handler) EvaluateStop(ctx context.Context, event Event) Output {
 		return Output{Continue: true, SystemMessage: "Jev evaluation failed; the answer was not blocked."}
 	}
 
-	bad := result.Decision != "pass"
+	bad := result.Decision != "pass" && result.Decision != "not_applicable"
 	if !bad {
 		_ = os.Remove(h.promptPath(event.SessionID))
 		return Output{Continue: true, SystemMessage: evaluationMessage(result, event.StopHookActive)}
@@ -123,6 +123,9 @@ func digest(value string) string {
 	return hex.EncodeToString(sum[:])
 }
 func evaluationMessage(result evaluator.Result, active bool) string {
+	if result.Decision == "not_applicable" {
+		return "Jev evaluation: not applicable."
+	}
 	if active {
 		return fmt.Sprintf("Jev evaluation: pass after one revision (requested=%s, answer=%s).", result.RequestedLevel, result.AnswerEntryLevel)
 	}
@@ -134,6 +137,9 @@ func revisionReason(result evaluator.Result) string {
 	case "ask_clarifying_question":
 		return "The requested abstraction level is ambiguous. Ask one concise clarifying question instead of assuming it."
 	case "restructure":
+		if result.RequestedLevel == result.AnswerEntryLevel {
+			return fmt.Sprintf("Keep the requested level (%s), but restructure the answer so its prerequisites and explanation order are clear before relying on details.", result.RequestedLevel)
+		}
 		return fmt.Sprintf("Rewrite the answer from the requested level (%s). It currently begins at %s. Establish the requested conceptual or architectural frame before implementation details.", result.RequestedLevel, result.AnswerEntryLevel)
 	default:
 		return "Revise the opening and explanation order. Establish the requested mental model before introducing concrete products, APIs, configuration, or code."
