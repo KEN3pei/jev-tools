@@ -1,0 +1,28 @@
+{
+  "description": "Evaluate final answers with Jev and request at most one revision.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/codex-hook --event user-prompt-submit",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/codex-hook --event stop",
+            "statusMessage": "Evaluating answer with Jev",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
