@@ -1,0 +1,107 @@
+{
+  "name": "go-intent-analyzer",
+  "displayName": "Go Intent Analyzer",
+  "description": "Visualize design intent inferred from Go code with Jev.",
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.20.0",
+  "publisher": "local",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Programming Languages"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:goIntentAnalyzer.analyzeWorkspace",
+    "onCommand:goIntentAnalyzer.clear",
+    "onCommand:goIntentAnalyzer.setApiKey",
+    "onView:goIntentAnalyzer.legend"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "goIntentAnalyzer.analyzeWorkspace",
+        "title": "Go Intent Analyzer: Analyze Workspace"
+      },
+      {
+        "command": "goIntentAnalyzer.clear",
+        "title": "Go Intent Analyzer: Clear Decorations"
+      },
+      {
+        "command": "goIntentAnalyzer.setApiKey",
+        "title": "Go Intent Analyzer: Set TypeSafe API Key"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "goIntentAnalyzer.legend",
+          "name": "Intent Legend"
+        }
+      ]
+    },
+    "colors": [
+      { "id": "goIntentAnalyzer.intent.simplicity", "description": "Simplicity intent color.", "defaults": { "dark": "#4CAF50", "light": "#4CAF50", "highContrast": "#4CAF50", "highContrastLight": "#4CAF50" } },
+      { "id": "goIntentAnalyzer.intent.change_localization", "description": "Change localization intent color.", "defaults": { "dark": "#26A69A", "light": "#26A69A", "highContrast": "#26A69A", "highContrastLight": "#26A69A" } },
+      { "id": "goIntentAnalyzer.intent.extensibility", "description": "Extensibility intent color.", "defaults": { "dark": "#42A5F5", "light": "#42A5F5", "highContrast": "#42A5F5", "highContrastLight": "#42A5F5" } },
+      { "id": "goIntentAnalyzer.intent.reliability", "description": "Reliability intent color.", "defaults": { "dark": "#5C6BC0", "light": "#5C6BC0", "highContrast": "#5C6BC0", "highContrastLight": "#5C6BC0" } },
+      { "id": "goIntentAnalyzer.intent.performance", "description": "Performance intent color.", "defaults": { "dark": "#AB47BC", "light": "#AB47BC", "highContrast": "#AB47BC", "highContrastLight": "#AB47BC" } },
+      { "id": "goIntentAnalyzer.intent.security", "description": "Security intent color.", "defaults": { "dark": "#EF5350", "light": "#EF5350", "highContrast": "#EF5350", "highContrastLight": "#EF5350" } },
+      { "id": "goIntentAnalyzer.intent.backward_compatibility", "description": "Backward compatibility intent color.", "defaults": { "dark": "#FF7043", "light": "#FF7043", "highContrast": "#FF7043", "highContrastLight": "#FF7043" } },
+      { "id": "goIntentAnalyzer.intent.testability", "description": "Testability intent color.", "defaults": { "dark": "#66BB6A", "light": "#66BB6A", "highContrast": "#66BB6A", "highContrastLight": "#66BB6A" } },
+      { "id": "goIntentAnalyzer.intent.operability", "description": "Operability intent color.", "defaults": { "dark": "#FFA726", "light": "#FFA726", "highContrast": "#FFA726", "highContrastLight": "#FFA726" } },
+      { "id": "goIntentAnalyzer.intent.migration_safety", "description": "Migration safety intent color.", "defaults": { "dark": "#8D6E63", "light": "#8D6E63", "highContrast": "#8D6E63", "highContrastLight": "#8D6E63" } },
+      { "id": "goIntentAnalyzer.intent.delivery_speed", "description": "Delivery speed intent color.", "defaults": { "dark": "#EC407A", "light": "#EC407A", "highContrast": "#EC407A", "highContrastLight": "#EC407A" } }
+    ],
+    "configuration": {
+      "title": "Go Intent Analyzer",
+      "properties": {
+        "goIntentAnalyzer.executablePath": {
+          "type": "string",
+          "default": "go-intent-analyzer",
+          "description": "Path to the go-intent-analyzer executable."
+        },
+        "goIntentAnalyzer.minimumEvidenceFit": {
+          "type": "number",
+          "default": 0.35,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Hide intent colors whose evidenceFit is below this value."
+        },
+        "goIntentAnalyzer.minimumConfidence": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Hide intent colors whose Jev confidence is below this value."
+        },
+        "goIntentAnalyzer.maxVisibleIntents": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 11,
+          "description": "Maximum number of strongest intents blended into a unit's background color."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "pnpm run compile && node --test dist/test/*.test.js",
+    "package": "pnpm run test && vsce package --allow-missing-repository --out ../../dist/go-intent-analyzer.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}
