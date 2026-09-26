@@ -60,6 +60,31 @@ go run ./cmd -dir ./path/to/repository > analysis.json
 -min-evidencefit   evidenceFitが指定値未満の意図を除外
 ```
 
+### 解析範囲
+
+CLIでは`-dir`に渡したディレクトリが解析ルートです。その配下を再帰的に走査し、通常のGoソースファイルを持つパッケージを解析します。`go-intent-analyzer`自身に解析対象を限定する処理はないため、任意のGoリポジトリまたはそのサブディレクトリを指定できます。
+
+```bash
+# 別のGoリポジトリ全体
+go-intent-analyzer -dir /absolute/path/to/another-repository > analysis.json
+
+# 現在のリポジトリ全体
+go-intent-analyzer -dir . > analysis.json
+
+# リポジトリ内の特定領域だけ
+go-intent-analyzer -dir ./backend > analysis.json
+```
+
+走査時には`.git`、`vendor`、名前が`.`で始まるディレクトリを除外します。また、通常のGoソースファイルがなく、`*_test.go`だけが存在するディレクトリは解析対象にしません。
+
+VS Code拡張では、`Go Intent Analyzer: Analyze Workspace`を実行した時点のワークスペースフォルダをCLIの`-dir`へ渡します。
+
+- 単一ルートワークスペース: 開いているフォルダ全体
+- 複数ルートワークスペース: アクティブなエディタが所属するワークスペースフォルダ。該当しない場合は最初のワークスペースフォルダ
+- 特定のサブディレクトリだけを解析したい場合: そのディレクトリをVS Codeで単独のフォルダとして開くか、CLIで`-dir`を指定
+
+現時点では、VS Code設定から解析対象のサブディレクトリや除外パターンを指定する機能はありません。解析はコマンド実行時だけ行われ、ファイル変更後に自動で再解析されません。
+
 ## 出力
 
 ```json

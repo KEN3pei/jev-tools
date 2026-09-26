@@ -39,6 +39,14 @@ The installer builds the CLI into `~/.local/bin/go-intent-analyzer`, packages an
 
 Analysis runs only when explicitly requested. Code with insufficient evidence is not colored.
 
+## Analysis scope
+
+`Go Intent Analyzer: Analyze Workspace` passes a workspace folder to the CLI as its `-dir` argument. In a single-root workspace, this is the open folder. In a multi-root workspace, the extension uses the workspace folder containing the active editor, or the first workspace folder when the active editor does not identify one.
+
+The CLI recursively analyzes Go packages below that folder, excluding `.git`, `vendor`, and directories whose names start with `.`. To analyze another repository, open that repository as the VS Code folder. To analyze only a subdirectory, open it as the VS Code folder or invoke the CLI directly with `-dir /path/to/subdirectory`.
+
+The extension does not currently provide a setting for an analysis subdirectory or exclusion patterns.
+
 ## Intent legend
 
 Open the **Intent Legend** view in Explorer to see the color assigned to each of the 11 intent categories. Hover over an entry to see its description and hexadecimal color value.
