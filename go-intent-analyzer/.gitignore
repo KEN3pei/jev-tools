@@ -1,0 +1,5 @@
+/bin/
+/dist/
+/analysis.json
+/editors/vscode/dist/
+/editors/vscode/node_modules/
