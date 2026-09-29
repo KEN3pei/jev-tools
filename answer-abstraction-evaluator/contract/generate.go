@@ -1,3 +1,3 @@
 package contract
 
-//go:generate sh -c "cd ../../jevgen && go run ./cmd/jevgen generate --config ../answer-abstraction-evaluator/jevgen.json"
+//go:generate go run github.com/KEN3pei/jevgen/cmd/jevgen@v0.0.0-20260929145722-086a061b614f generate --config ../jevgen.json
