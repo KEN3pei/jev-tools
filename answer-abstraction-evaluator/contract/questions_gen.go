@@ -9,7 +9,7 @@ import (
 
 const QuestionSetName = "answer-abstraction-evaluator"
 const SchemaVersion = "1.0.0"
-const SchemaHash = "sha256:3d9f9062ee2154bd795a8918881fc5aa9fa52d4d0943b22e2ce2cc0b6fcc935a"
+const SchemaHash = "sha256:55d62b4bef42d538ebf9b3d3fffe607ade1c9970b4b1cb170ecaf6b1ee7e264a"
 
 type Question struct {
 	Type         string `json:"type"`

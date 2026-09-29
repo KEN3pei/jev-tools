@@ -8,9 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	differ "github.com/KEN3pei/jev-tools/jevgen/internal/diff"
-	"github.com/KEN3pei/jev-tools/jevgen/internal/generate"
-	"github.com/KEN3pei/jev-tools/jevgen/internal/schema"
+	"github.com/KEN3pei/jev-tools/jevgen"
 )
 
 func main() {
@@ -27,52 +25,60 @@ func run(args []string) error {
 	switch args[0] {
 	case "generate":
 		flags := flag.NewFlagSet("generate", flag.ContinueOnError)
-		input := flags.String("input", "", "question set JSON")
-		output := flags.String("output", "questions_gen.go", "generated Go file")
-		pkg := flags.String("package", "jevschema", "generated Go package")
+		configPath := flags.String("config", jevgen.DefaultConfigPath, "configuration file")
+		input := flags.String("input", "", "override question set path")
+		output := flags.String("output", "", "override generated Go path")
+		pkg := flags.String("package", "", "override generated Go package")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
-		set, err := schema.Load(*input)
+		config, err := commandConfig(*configPath, *input, *output, *pkg)
 		if err != nil {
 			return err
 		}
-		code, err := generate.Go(set, *pkg)
+		set, err := jevgen.LoadQuestionSet(config.InputPath())
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(filepath.Dir(*output), 0o755); err != nil {
+		code, err := jevgen.GenerateGo(set, config.Package)
+		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(*output, code, 0o644); err != nil {
+		if err := os.MkdirAll(filepath.Dir(config.OutputPath()), 0o755); err != nil {
 			return err
 		}
-		fmt.Println(*output)
+		if err := os.WriteFile(config.OutputPath(), code, 0o644); err != nil {
+			return err
+		}
+		fmt.Println(config.OutputPath())
 		return nil
 	case "check":
 		flags := flag.NewFlagSet("check", flag.ContinueOnError)
-		input := flags.String("input", "", "question set JSON")
-		output := flags.String("output", "", "generated Go file to verify")
-		pkg := flags.String("package", "jevschema", "generated Go package")
+		configPath := flags.String("config", jevgen.DefaultConfigPath, "configuration file")
+		input := flags.String("input", "", "override question set path")
+		output := flags.String("output", "", "override generated Go path")
+		pkg := flags.String("package", "", "override generated Go package")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
-		set, err := schema.Load(*input)
+		config, err := commandConfig(*configPath, *input, *output, *pkg)
 		if err != nil {
 			return err
 		}
-		if *output != "" {
-			want, err := generate.Go(set, *pkg)
-			if err != nil {
-				return err
-			}
-			got, err := os.ReadFile(*output)
-			if err != nil {
-				return err
-			}
-			if string(got) != string(want) {
-				return fmt.Errorf("generated file is stale: %s", *output)
-			}
+		set, err := jevgen.LoadQuestionSet(config.InputPath())
+		if err != nil {
+			return err
+		}
+		want, err := jevgen.GenerateGo(set, config.Package)
+		if err != nil {
+			return err
+		}
+		got, err := os.ReadFile(config.OutputPath())
+		if err != nil {
+			return err
+		}
+		if string(got) != string(want) {
+			return fmt.Errorf("generated file is stale: %s", config.OutputPath())
 		}
 		hash, err := set.Hash()
 		if err != nil {
@@ -87,16 +93,44 @@ func run(args []string) error {
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
-		oldSet, err := schema.Load(*oldPath)
+		oldSet, err := jevgen.LoadQuestionSet(*oldPath)
 		if err != nil {
 			return fmt.Errorf("old: %w", err)
 		}
-		newSet, err := schema.Load(*newPath)
+		newSet, err := jevgen.LoadQuestionSet(*newPath)
 		if err != nil {
 			return fmt.Errorf("new: %w", err)
 		}
-		return json.NewEncoder(os.Stdout).Encode(differ.Compare(oldSet, newSet))
+		return json.NewEncoder(os.Stdout).Encode(jevgen.Compare(oldSet, newSet))
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func commandConfig(configPath, input, output, packageName string) (jevgen.Config, error) {
+	config, err := jevgen.LoadConfigOrDefault(configPath)
+	if err != nil {
+		return jevgen.Config{}, err
+	}
+	if input != "" {
+		absolute, err := filepath.Abs(input)
+		if err != nil {
+			return jevgen.Config{}, err
+		}
+		config.Input = absolute
+	}
+	if output != "" {
+		absolute, err := filepath.Abs(output)
+		if err != nil {
+			return jevgen.Config{}, err
+		}
+		config.Output = absolute
+	}
+	if packageName != "" {
+		config.Package = packageName
+	}
+	if err := config.Validate(); err != nil {
+		return jevgen.Config{}, err
+	}
+	return config, nil
 }

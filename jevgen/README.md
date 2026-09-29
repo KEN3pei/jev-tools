@@ -1,26 +1,64 @@
 # jevgen
 
-`jevgen`は、JEV Question Setを契約定義としてGoのquestion定義と型付きanswerを生成するコマンドです。
+`jevgen`は、JEV Question Setを契約定義としてGoのquestion定義と型付きanswerを生成するGo package兼コマンドです。検証規則はGo packageに実装されており、外部のJSON Schemaや同梱データファイルには依存しません。
+
+## Installation
+
+```bash
+go install github.com/KEN3pei/jev-tools/jevgen/cmd/jevgen@latest
+```
+
+Go packageとして利用する場合:
+
+```bash
+go get github.com/KEN3pei/jev-tools/jevgen@latest
+```
+
+```go
+set, err := jevgen.LoadQuestionSet("questions.json")
+if err != nil {
+    return err
+}
+
+source, err := jevgen.GenerateGo(set, "jevschema")
+```
+
+公開APIには`QuestionSet`、`Question`、`Config`、`LoadQuestionSet`、`GenerateGo`、`Compare`が含まれます。
+
+## Configuration
+
+デフォルトではカレントディレクトリの`jevgen.json`を読みます。
+
+```json
+{
+  "version": "1",
+  "input": "contract/questions.json",
+  "output": "contract/questions_gen.go",
+  "package": "contract"
+}
+```
+
+設定ファイル内の相対パスは、設定ファイルが置かれたディレクトリを基準に解決されます。`jevgen.json`が存在しない場合は以下の組み込みデフォルトを使います。
+
+- input: `questions.json`
+- output: `questions_gen.go`
+- package: `jevschema`
 
 ## Commands
 
 ```bash
-go run ./cmd/jevgen check --input testdata/questions.json
+jevgen generate
 
-go run ./cmd/jevgen check \
-  --input ../answer-abstraction-evaluator/contract/questions.json \
-  --output ../answer-abstraction-evaluator/contract/questions_gen.go \
-  --package contract
+jevgen check
 
-go run ./cmd/jevgen generate \
-  --input testdata/questions.json \
-  --output /tmp/jevschema/questions_gen.go \
-  --package jevschema
+jevgen generate --config tools/jevgen.json
 
-go run ./cmd/jevgen diff \
-  --old testdata/questions.json \
+jevgen diff \
+  --old path/to/old-questions.json \
   --new path/to/new-questions.json
 ```
+
+`generate`と`check`では`--input`、`--output`、`--package`で設定値を上書きできます。CLIで指定した相対パスはカレントディレクトリを基準に解決されます。
 
 `diff`は変更を次のように分類します。
 
