@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "input": "contract/questions.json",
+  "output": "contract/questions_gen.go",
+  "package": "contract"
+}

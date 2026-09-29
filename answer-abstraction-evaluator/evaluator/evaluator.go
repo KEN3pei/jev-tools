@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/KEN3pei/jev-tools/answer-abstraction-evaluator/contract"
 )
 
 const (
@@ -19,57 +21,6 @@ type Input struct {
 	PrecedingContext []string `json:"precedingContext,omitempty"`
 	UserRequest      string   `json:"userRequest"`
 	CandidateAnswer  string   `json:"candidateAnswer"`
-}
-
-type Question struct {
-	Type         string            `json:"type"`
-	Instructions string            `json:"instructions"`
-	Criteria     map[string]string `json:"criteria"`
-}
-
-var Questions = map[string]Question{
-	"evaluation_applicable": {
-		Type: "noul", Instructions: "Does answering `user_request` require choosing and progressively developing an abstraction level, rather than directly providing an action, fact, code snippet, command, transformation, status, acknowledgement, or clarification?",
-		Criteria: map[string]string{"true": "The usefulness of the answer materially depends on conceptual framing, explanation order, or progressive disclosure.", "false": "The request primarily asks for a direct action, fact, command, code, transformation, status, acknowledgement, or clarification."},
-	},
-	"requested_level": {
-		Type: "choice", Instructions: "What is the primary abstraction level requested by `user_request`, interpreted with `preceding_context`?",
-		Criteria: levelCriteria(),
-	},
-	"answer_entry_level": {
-		Type: "choice", Instructions: "At what abstraction level does `candidate_answer` begin its substantive explanation?",
-		Criteria: levelCriteria(),
-	},
-	"abstraction_mismatch": {
-		Type: "noul", Instructions: "Does `candidate_answer` begin at a materially different abstraction level from the one primarily requested, making orientation harder even if later content is relevant?",
-		Criteria: map[string]string{"true": "The answer starts too concretely or too abstractly relative to the request.", "false": "The answer starts at an appropriate level and then moves through detail coherently."},
-	},
-	"premature_specificity": {
-		Type: "noul", Instructions: "Does `candidate_answer` introduce code, products, APIs, configuration, or implementation mechanisms before establishing the mental model requested by the user?",
-		Criteria: map[string]string{"true": "Specific detail arrives before the reader has an adequate conceptual map.", "false": "The conceptual map is established first, or implementation detail is clearly the primary request."},
-	},
-	"progressive_disclosure": {
-		Type: "noul", Instructions: "Does `candidate_answer` progress in an appropriate order from the requested level toward patterns, tradeoffs, examples, and implementation details?",
-		Criteria: map[string]string{"true": "The answer introduces detail in an order that supports understanding.", "false": "The answer jumps between levels or introduces lower-level detail before the necessary foundation."},
-	},
-	"prerequisite_fit": {
-		Type: "noul", Instructions: "Does `candidate_answer` avoid assuming that the user already understands concepts they are currently asking to understand?",
-		Criteria: map[string]string{"true": "The answer supplies the necessary conceptual prerequisites before relying on them.", "false": "The answer relies on unexplained concepts that are part of the user's current learning goal."},
-	},
-	"clarification_needed": {
-		Type: "noul", Instructions: "Was the intended abstraction level too ambiguous to choose a reasonable answer sequence without asking a clarifying question?",
-		Criteria: map[string]string{"true": "Multiple materially different levels were equally plausible from the available context.", "false": "The request and preceding context provided enough evidence to choose a reasonable level."},
-	},
-}
-
-func levelCriteria() map[string]string {
-	return map[string]string{
-		"conceptual_orientation":        "A basic definition, orientation, or mental model is primary.",
-		"architecture_and_design_space": "System patterns, components, boundaries, alternatives, and tradeoffs are primary.",
-		"implementation_mechanics":      "Concrete code, APIs, configuration, commands, or integration steps are primary.",
-		"operations_and_governance":     "Deployment, monitoring, reliability, security, governance, or organizational operation is primary.",
-		"unclear":                       "The intended abstraction level cannot be inferred reliably.",
-	}
 }
 
 type Thresholds struct {
@@ -100,23 +51,15 @@ type Scores struct {
 }
 
 type Result struct {
-	RequestedLevel             string            `json:"requestedLevel"`
-	RequestedLevelConfidence   float64           `json:"requestedLevelConfidence"`
-	AnswerEntryLevel           string            `json:"answerEntryLevel"`
-	AnswerEntryLevelConfidence float64           `json:"answerEntryLevelConfidence"`
-	Scores                     Scores            `json:"scores"`
-	Decision                   string            `json:"decision"`
-	Model                      string            `json:"model,omitempty"`
-	Usage                      map[string]any    `json:"usage,omitempty"`
-	RawAnswers                 map[string]Answer `json:"rawAnswers"`
-}
-
-type Answer struct {
-	Type          string             `json:"type"`
-	Choice        string             `json:"choice,omitempty"`
-	Confidence    float64            `json:"confidence,omitempty"`
-	Probabilities map[string]float64 `json:"probabilities,omitempty"`
-	Noul          *float64           `json:"noul,omitempty"`
+	RequestedLevel             string           `json:"requestedLevel"`
+	RequestedLevelConfidence   float64          `json:"requestedLevelConfidence"`
+	AnswerEntryLevel           string           `json:"answerEntryLevel"`
+	AnswerEntryLevelConfidence float64          `json:"answerEntryLevelConfidence"`
+	Scores                     Scores           `json:"scores"`
+	Decision                   string           `json:"decision"`
+	Model                      string           `json:"model,omitempty"`
+	Usage                      map[string]any   `json:"usage,omitempty"`
+	RawAnswers                 contract.Answers `json:"rawAnswers"`
 }
 
 type Client struct {
@@ -181,7 +124,7 @@ func (c Client) Evaluate(ctx context.Context, input Input) (Result, error) {
 	if thresholds == (Thresholds{}) {
 		thresholds = DefaultThresholds
 	}
-	payload, err := json.Marshal(map[string]any{"model": model, "state": state, "questions": Questions})
+	payload, err := json.Marshal(map[string]any{"model": model, "state": state, "questions": contract.Questions()})
 	if err != nil {
 		return Result{}, err
 	}
@@ -208,43 +151,24 @@ func (c Client) Evaluate(ctx context.Context, input Input) (Result, error) {
 		return Result{}, fmt.Errorf("Jev request failed (%d): %.300s", resp.StatusCode, body)
 	}
 	var apiResult struct {
-		Answers map[string]Answer `json:"answers"`
-		Model   string            `json:"model"`
-		Usage   map[string]any    `json:"usage"`
+		Answers json.RawMessage `json:"answers"`
+		Model   string          `json:"model"`
+		Usage   map[string]any  `json:"usage"`
 	}
 	if err := json.Unmarshal(body, &apiResult); err != nil {
 		return Result{}, fmt.Errorf("decode Jev response: %w", err)
 	}
-	getNoul := func(name string) (float64, error) {
-		a, ok := apiResult.Answers[name]
-		if !ok || a.Noul == nil {
-			return 0, fmt.Errorf("Jev response is missing a valid Noul answer: %s", name)
-		}
-		return *a.Noul, nil
-	}
-	requested, ok := apiResult.Answers["requested_level"]
-	if !ok || requested.Choice == "" {
-		return Result{}, fmt.Errorf("Jev response is missing requested_level")
-	}
-	entry, ok := apiResult.Answers["answer_entry_level"]
-	if !ok || entry.Choice == "" {
-		return Result{}, fmt.Errorf("Jev response is missing answer_entry_level")
-	}
-	names := []string{"evaluation_applicable", "abstraction_mismatch", "premature_specificity", "progressive_disclosure", "prerequisite_fit", "clarification_needed"}
-	values := make([]float64, len(names))
-	for i, name := range names {
-		values[i], err = getNoul(name)
-		if err != nil {
-			return Result{}, err
-		}
+	answers, err := contract.DecodeAnswers(apiResult.Answers)
+	if err != nil {
+		return Result{}, fmt.Errorf("decode Jev answers: %w", err)
 	}
 	scores := Scores{
-		EvaluationApplicable:  values[0],
-		AbstractionMismatch:   values[1],
-		PrematureSpecificity:  values[2],
-		ProgressiveDisclosure: values[3],
-		PrerequisiteFit:       values[4],
-		ClarificationNeeded:   values[5],
+		EvaluationApplicable:  answers.EvaluationApplicable.Noul,
+		AbstractionMismatch:   answers.AbstractionMismatch.Noul,
+		PrematureSpecificity:  answers.PrematureSpecificity.Noul,
+		ProgressiveDisclosure: answers.ProgressiveDisclosure.Noul,
+		PrerequisiteFit:       answers.PrerequisiteFit.Noul,
+		ClarificationNeeded:   answers.ClarificationNeeded.Noul,
 	}
-	return Result{requested.Choice, requested.Confidence, entry.Choice, entry.Confidence, scores, Decide(scores, thresholds), apiResult.Model, apiResult.Usage, apiResult.Answers}, nil
+	return Result{string(answers.RequestedLevel.Choice), answers.RequestedLevel.Confidence, string(answers.AnswerEntryLevel.Choice), answers.AnswerEntryLevel.Confidence, scores, Decide(scores, thresholds), apiResult.Model, apiResult.Usage, answers}, nil
 }
