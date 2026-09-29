@@ -1,0 +1,77 @@
+{
+  "$schema": "../../jevgen/schema/jev-question-set.schema.json",
+  "schemaVersion": "1.0.0",
+  "name": "answer-abstraction-evaluator",
+  "questions": {
+    "evaluation_applicable": {
+      "type": "noul",
+      "instructions": "Does answering `user_request` require choosing and progressively developing an abstraction level, rather than directly providing an action, fact, code snippet, command, transformation, status, acknowledgement, or clarification?",
+      "criteria": {
+        "true": "The usefulness of the answer materially depends on conceptual framing, explanation order, or progressive disclosure.",
+        "false": "The request primarily asks for a direct action, fact, command, code, transformation, status, acknowledgement, or clarification."
+      }
+    },
+    "requested_level": {
+      "type": "choice",
+      "instructions": "What is the primary abstraction level requested by `user_request`, interpreted with `preceding_context`?",
+      "criteria": {
+        "conceptual_orientation": "A basic definition, orientation, or mental model is primary.",
+        "architecture_and_design_space": "System patterns, components, boundaries, alternatives, and tradeoffs are primary.",
+        "implementation_mechanics": "Concrete code, APIs, configuration, commands, or integration steps are primary.",
+        "operations_and_governance": "Deployment, monitoring, reliability, security, governance, or organizational operation is primary.",
+        "unclear": "The intended abstraction level cannot be inferred reliably."
+      }
+    },
+    "answer_entry_level": {
+      "type": "choice",
+      "instructions": "At what abstraction level does `candidate_answer` begin its substantive explanation?",
+      "criteria": {
+        "conceptual_orientation": "A basic definition, orientation, or mental model is primary.",
+        "architecture_and_design_space": "System patterns, components, boundaries, alternatives, and tradeoffs are primary.",
+        "implementation_mechanics": "Concrete code, APIs, configuration, commands, or integration steps are primary.",
+        "operations_and_governance": "Deployment, monitoring, reliability, security, governance, or organizational operation is primary.",
+        "unclear": "The intended abstraction level cannot be inferred reliably."
+      }
+    },
+    "abstraction_mismatch": {
+      "type": "noul",
+      "instructions": "Does `candidate_answer` begin at a materially different abstraction level from the one primarily requested, making orientation harder even if later content is relevant?",
+      "criteria": {
+        "true": "The answer starts too concretely or too abstractly relative to the request.",
+        "false": "The answer starts at an appropriate level and then moves through detail coherently."
+      }
+    },
+    "premature_specificity": {
+      "type": "noul",
+      "instructions": "Does `candidate_answer` introduce code, products, APIs, configuration, or implementation mechanisms before establishing the mental model requested by the user?",
+      "criteria": {
+        "true": "Specific detail arrives before the reader has an adequate conceptual map.",
+        "false": "The conceptual map is established first, or implementation detail is clearly the primary request."
+      }
+    },
+    "progressive_disclosure": {
+      "type": "noul",
+      "instructions": "Does `candidate_answer` progress in an appropriate order from the requested level toward patterns, tradeoffs, examples, and implementation details?",
+      "criteria": {
+        "true": "The answer introduces detail in an order that supports understanding.",
+        "false": "The answer jumps between levels or introduces lower-level detail before the necessary foundation."
+      }
+    },
+    "prerequisite_fit": {
+      "type": "noul",
+      "instructions": "Does `candidate_answer` avoid assuming that the user already understands concepts they are currently asking to understand?",
+      "criteria": {
+        "true": "The answer supplies the necessary conceptual prerequisites before relying on them.",
+        "false": "The answer relies on unexplained concepts that are part of the user's current learning goal."
+      }
+    },
+    "clarification_needed": {
+      "type": "noul",
+      "instructions": "Was the intended abstraction level too ambiguous to choose a reasonable answer sequence without asking a clarifying question?",
+      "criteria": {
+        "true": "Multiple materially different levels were equally plausible from the available context.",
+        "false": "The request and preceding context provided enough evidence to choose a reasonable level."
+      }
+    }
+  }
+}
